@@ -1,3 +1,5 @@
+// Copyright ©️  Zach Nielsen 2022
+
 use std::collections::BTreeMap;
 
 mod responses;
