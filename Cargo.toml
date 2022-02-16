@@ -1,0 +1,11 @@
+[package]
+name = "song_syncer"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "*", features = ["derive"] }
+reqwest = { version = "0.11", features = ["json", "blocking"] }
+md5 = "0.7"
