@@ -3,15 +3,31 @@
 use std::collections::BTreeMap;
 use reqwest::StatusCode;
 
-use crate::responses;
-
 const API_ROOT: &'static str = "http://ws.audioscrobbler.com/2.0";
+
+mod responses {
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    pub struct GetSession {
+        pub name: String,
+        pub key: String,
+        pub subscriber: u64,
+    }
+
+    #[derive(Deserialize)]
+    pub struct Error {
+        pub error: u64,
+        pub message: String,
+    }
+}
 
 pub struct ApiKeys {
     pub api_key: String,
     pub secret:  String,
 }
 
+/// Requires sorting all parameters of the call, so we use BTreeMap (which gives us sorting automatically)
 /// https://www.last.fm/api/desktopauth#_6-sign-your-calls
 pub fn construct_api_signature(lastfm: &ApiKeys, middle_map: &mut BTreeMap<String, String>) -> String {
     let middle_bit = construct_middle_bit(middle_map);
@@ -36,6 +52,7 @@ pub fn get_token(lastfm: &ApiKeys) -> String {
         Ok(s) => {},
     }
 
+    // TODO
     format!("TODO")
 }
 
@@ -57,6 +74,7 @@ pub fn construct_uri(lastfm: &ApiKeys, map: &mut BTreeMap<String, String>) -> St
     uri
 }
 
+/// https://www.last.fm/api/show/auth.getSession
 pub fn get_session_key(lastfm: &ApiKeys) -> String {
     // TODO - check storage
 
