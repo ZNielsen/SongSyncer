@@ -1,11 +1,20 @@
 // Copyright ©️  Zach Nielsen 2022
 
+#![feature(decl_macro)]
+#[macro_use] extern crate rocket;
+
 use std::collections::{HashMap, BTreeMap};
 use std::io::BufRead;
 
 mod spotify;
 mod lastfm;
 
+#[get("/callbacks")]
+// fn token_callback(shutdown: rocket::Shutdown) {
+fn token_callback() {
+    // this will have the token?
+    // shutdown.notify();
+}
 
 fn main() {
     // Set up API keys and the like
@@ -25,10 +34,25 @@ fn main() {
         api_key: secrets_map.get("lastfm_api_key").unwrap().to_owned(),
         secret:  secrets_map.get("lastfm_shared_secret").unwrap().to_owned(),
     };
-    println!("spotify: id: {}, secret: {}", spotify.id, spotify.secret);
+
+    //
+    // Authenticate through spotify
+    //
+    // Fire up a rocket server to field the callback
+    let config = rocket::config::Config::build(rocket::config::Environment::Development)
+        .port(7777)
+        .workers(1)
+        .unwrap();
+    let rocket = rocket::custom(config).mount("/", routes![token_callback]);
+    std::thread::spawn(move || {
+        let launched = rocket.launch();
+    });
+
+    // Get a token
+    let token = spotify::get_token(&spotify);
+    // TODO - Kill rocket once we have the token? Do we need it for other requests?
 
     // Query for any new liked songs
-    let token = spotify::get_token(&spotify);
     let liked_songs = spotify::get_new_liked_tracks(&spotify, &token);
 
     //

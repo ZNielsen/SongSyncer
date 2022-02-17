@@ -78,14 +78,30 @@ pub fn get_new_liked_tracks(spotify: &ClientKeys, token: &responses::ApiToken) -
     ret_vec
 }
 
+pub fn authorize(spotify: &ClientKeys) {
+    let uri = format!("{}/{}?client_id={}&response_type=token&redirect_uri={}&scope={}&json=true",
+                API_ROOT, "authorize", spotify.id, "http:localhost:7777/callback", "user-library-read" );
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .get(&uri)
+        // .header("Authorization", format!("Bearer {}:{}", spotify.id, spotify.secret))
+        // .header("Content-Type", "application/x-www-form-urlencoded")
+        .send();
+    let response = parse_response(&uri, response);
+    // response.json::<responses::ApiToken>().expect("response to be deserializable")
+}
+
 /// https://developer.spotify.com/documentation/general/guides/authorization/client-credentials/
 pub fn get_token(spotify: &ClientKeys) -> responses::ApiToken {
-    let uri = format!("{}/{}?json=true", API_ROOT, "api/token");
+    authorize(spotify);
+    // panic!("Did I authorize?");
+    // let uri = format!("{}/{}?{}&json=true", API_ROOT, "api/token", "grant_type=client_credentials");
+    let uri = format!("{}/{}?refresh_token=&json=true", API_ROOT, "api/token");
     let client = reqwest::blocking::Client::new();
     let response = client
         .post(&uri)
-        .body("grant_type=client_credentials")
-        .header("Authorization", format!("Basic {}:{}", spotify.id, spotify.secret))
+        .body("grant_type=refresh_credentials")
+        .header("Authorization", format!("Bearer {}:{}", spotify.id, spotify.secret))
         .header("Content-Type", "application/x-www-form-urlencoded")
         .send();
     let response = parse_response(&uri, response);
