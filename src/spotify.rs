@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 const API_ROOT: &'static str = "https://api.spotify.com/v1";
 
-mod responses {
+pub mod responses {
     use serde::Deserialize;
 
     #[derive(Deserialize)]
@@ -13,13 +13,18 @@ mod responses {
         pub expires_in:   u64,
     }
 
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Debug)]
+    pub struct ErrorWrapper {
+        pub error: Error,
+    }
+
+    #[derive(Deserialize, Debug)]
     pub struct Error {
         pub status: i64,
         pub message: String,
     }
 
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Debug)]
     pub struct AuthError {
         pub error: String,
         pub error_description: String,
@@ -64,7 +69,9 @@ pub fn get_new_liked_tracks(spotify: &ClientKeys, token: &responses::ApiToken) -
             .get(&uri)
             .header("Authorization", format!("{} {}", token.token_type, token.access_token))
             .send();
+        println!("raw response: {:?}", response);
         let response = parse_response(&uri, response);
+        println!("raw response: {:?}", response);
         let tracks = response.json::<responses::Tracks>().expect("response to be deserializable");
 
         println!("DEBUG: Tracks: {:?}", tracks);
@@ -78,30 +85,20 @@ pub fn get_new_liked_tracks(spotify: &ClientKeys, token: &responses::ApiToken) -
     ret_vec
 }
 
-pub fn authorize(spotify: &ClientKeys) {
-    let uri = format!("{}/{}?client_id={}&response_type=token&redirect_uri={}&scope={}&json=true",
-                API_ROOT, "authorize", spotify.id, "http:localhost:7777/callback", "user-library-read" );
-    let client = reqwest::blocking::Client::new();
-    let response = client
-        .get(&uri)
-        // .header("Authorization", format!("Bearer {}:{}", spotify.id, spotify.secret))
-        // .header("Content-Type", "application/x-www-form-urlencoded")
-        .send();
-    let response = parse_response(&uri, response);
-    // response.json::<responses::ApiToken>().expect("response to be deserializable")
+pub fn get_authorize_url(spotify: &ClientKeys) {
+    println!("Authorize at: {}?client_id={}&response_type=token&redirect_uri={}&scope={}&json=true",
+                "https://accounts.spotify.com/authorize", &spotify.id, "http://localhost:7777/callback", "user-library-read" );
 }
 
 /// https://developer.spotify.com/documentation/general/guides/authorization/client-credentials/
 pub fn get_token(spotify: &ClientKeys) -> responses::ApiToken {
-    authorize(spotify);
-    // panic!("Did I authorize?");
     // let uri = format!("{}/{}?{}&json=true", API_ROOT, "api/token", "grant_type=client_credentials");
-    let uri = format!("{}/{}?refresh_token=&json=true", API_ROOT, "api/token");
+    let uri = format!("{}/{}", API_ROOT, "api/token");
     let client = reqwest::blocking::Client::new();
     let response = client
         .post(&uri)
-        .body("grant_type=refresh_credentials")
-        .header("Authorization", format!("Bearer {}:{}", spotify.id, spotify.secret))
+        .body("grant_type=authorization_code")
+        .header("Authorization", format!("Basic {}:{}", base64_url::encode(&spotify.id), base64_url::encode(&spotify.secret)))
         .header("Content-Type", "application/x-www-form-urlencoded")
         .send();
     let response = parse_response(&uri, response);
@@ -117,9 +114,8 @@ fn parse_response(uri: &str, resp: Result<reqwest::blocking::Response, reqwest::
             println!("uri response: [{}]: {}", uri, response.status());
             if response.status() != reqwest::StatusCode::OK {
                 println!("raw response: {:?}", response);
-                let err: responses::AuthError = response.json().expect("response to be deserializable");
-                println!("Error from spotify: {}: {}", err.error, err.error_description);
-                panic!("Error from spotify: {}: {}", err.error, err.error_description);
+                let err: responses::ErrorWrapper = response.json().expect("response to be deserializable");
+                panic!("Error from spotify: {}: {}", err.error.status, err.error.message);
             }
 
             response

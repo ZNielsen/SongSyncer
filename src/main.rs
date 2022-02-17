@@ -34,6 +34,8 @@ fn main() {
         api_key: secrets_map.get("lastfm_api_key").unwrap().to_owned(),
         secret:  secrets_map.get("lastfm_shared_secret").unwrap().to_owned(),
     };
+    // println!("spotify: id: {}, secret: {}", spotify.id, spotify.secret);
+    // println!("lastfm: id: {}, secret: {}", lastfm.id, lastfm.secret);
 
     //
     // Authenticate through spotify
@@ -49,7 +51,19 @@ fn main() {
     });
 
     // Get a token
-    let token = spotify::get_token(&spotify);
+    spotify::get_authorize_url(&spotify);
+    std::thread::sleep(core::time::Duration::from_secs(3));
+    println!("Press enter when you have logged in...");
+    let mut ret = String::new();
+    std::io::stdin().read_line(&mut ret).expect("Failed to read from stdin");
+
+    let token = spotify::responses::ApiToken {
+        access_token: secrets_map.get("token").unwrap().to_owned(),
+        token_type: "Bearer".to_owned(),
+        expires_in: 3600
+    };
+
+    // let token = spotify::get_token(&spotify);
     // TODO - Kill rocket once we have the token? Do we need it for other requests?
 
     // Query for any new liked songs
