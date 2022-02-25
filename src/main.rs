@@ -4,16 +4,23 @@
 #[macro_use] extern crate rocket;
 
 use std::collections::{HashMap, BTreeMap};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::io::BufRead;
 
 mod spotify;
 mod lastfm;
 
-#[get("/callbacks")]
+#[get("/callback")]
 // fn token_callback(shutdown: rocket::Shutdown) {
-fn token_callback() {
+fn token_callback(waiting: rocket::State<CallbackBool>) {
     // this will have the token?
     // shutdown.notify();
+    waiting.val.store(false, Ordering::Relaxed);
+}
+
+struct CallbackBool {
+    val: Arc<AtomicBool>,
 }
 
 fn main() {
@@ -45,9 +52,12 @@ fn main() {
         .port(7777)
         .workers(1)
         .unwrap();
-    let rocket = rocket::custom(config).mount("/", routes![token_callback]);
+    let waiting = Arc::new(AtomicBool::new(true));
+    let rocket = rocket::custom(config)
+        .manage(CallbackBool { val: waiting.clone() })
+        .mount("/", routes![token_callback]);
     std::thread::spawn(move || {
-        let launched = rocket.launch();
+        let _launched = rocket.launch();
     });
 
     // Get a token
@@ -55,16 +65,21 @@ fn main() {
     std::thread::sleep(core::time::Duration::from_secs(3));
     println!("Press enter when you have logged in...");
     let mut ret = String::new();
-    std::io::stdin().read_line(&mut ret).expect("Failed to read from stdin");
+    let thread_waiting = waiting.clone();
+    std::thread::spawn(move || {
+        std::io::stdin().read_line(&mut ret).expect("Failed to read from stdin");
+        thread_waiting.store(false, Ordering::Relaxed);
+    });
+    while waiting.load(Ordering::Relaxed) {
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+    }
 
     let token = spotify::responses::ApiToken {
         access_token: secrets_map.get("token").unwrap().to_owned(),
         token_type: "Bearer".to_owned(),
         expires_in: 3600
     };
-
-    // let token = spotify::get_token(&spotify);
-    // TODO - Kill rocket once we have the token? Do we need it for other requests?
+    // TODO - refresh token so I don't have to re-log in.
 
     // Query for any new liked songs
     let liked_songs = spotify::get_new_liked_tracks(&spotify, &token);
